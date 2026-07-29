@@ -23,25 +23,21 @@ app.get('/api/canales', async (req, res) => {
         });
 
         const html = respuestaCV.data;
-        // Buscar el ID del video de DailyMotion en la página de Color Visión
         const matchDM = html.match(/dailymotion\.com\/embed\/video\/([a-zA-Z0-9]+)/i) || html.match(/geo\.dailymotion\.com\/player\/[^.]+\.html\?video=([a-zA-Z0-9]+)/i);
 
         if (matchDM && matchDM[1]) {
             const videoId = matchDM[1];
-            // Consultar la API pública de DailyMotion para obtener el m3u8 directo
-            const resDM = await axios.get(`https://api.dailymotion.com/video/${videoId}?fields=stream_hls_url`);
-            if (resDM.data && resDM.data.stream_hls_url) {
-                urlColorVision = resDM.data.stream_hls_url;
-            }
+            // Construir la URL m3u8 directa de CDN de Dailymotion
+            urlColorVision = `https://www.dailymotion.com/cdn/live/video/${videoId}.m3u8`;
         }
     } catch (error) {
-        console.log("No se pudo extraer dinámicamente Color Visión, usando URL de reserva.");
+        console.log("Error extrayendo Color Visión, usando URL de reserva.");
     }
 
     const canalesDominicanos = [
         {
             title: "Color Visión (Canal 9)",
-            description: "Noticias, opinión y programas de televisión dominicana.",
+            description: "Noticias y programación dominicana.",
             streamUrl: urlColorVision,
             headers: [
                 "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -53,9 +49,6 @@ app.get('/api/canales', async (req, res) => {
             title: "Telemicro (Canal 5)",
             description: "Entretenimiento y programas dominicanos en vivo.",
             streamUrl: "https://stmv1.srvif.com/telemicro/telemicro/playlist.m3u8",
-            headers: [
-                "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            ],
             poster: "https://i.imgur.com/vH9Z6X2.png"
         }
     ];
