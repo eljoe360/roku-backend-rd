@@ -1,61 +1,45 @@
 const express = require('express');
-const cors = require('cors');
 const axios = require('axios');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-
-app.get('/', (req, res) => {
-    res.send('Servidor de Canales Dominicanos activo.');
-});
-
-app.get('/api/canales', async (req, res) => {
-    let urlColorVision = "https://stream.colorvision.com.do/live/colorvision/playlist.m3u8";
-
+// Endpoint directo que nunca expira para el Roku
+app.get('/live/colorvision.m3u8', async (req, res) => {
     try {
         const respuestaCV = await axios.get('https://colorvision.com.do/en-vivo/', {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            timeout: 5000
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            timeout: 4000
         });
 
         const html = respuestaCV.data;
-        const matchDM = html.match(/dailymotion\.com\/embed\/video\/([a-zA-Z0-9]+)/i) || html.match(/geo\.dailymotion\.com\/player\/[^.]+\.html\?video=([a-zA-Z0-9]+)/i);
+        const matchDM = html.match(/dailymotion\.com\/embed\/video\/([a-zA-Z0-9]+)/i) || 
+                        html.match(/geo\.dailymotion\.com\/player\/[^.]+\.html\?video=([a-zA-Z0-9]+)/i);
 
         if (matchDM && matchDM[1]) {
             const videoId = matchDM[1];
-            // Construir la URL m3u8 directa de CDN de Dailymotion
-            urlColorVision = `https://www.dailymotion.com/cdn/live/video/${videoId}.m3u8`;
+            const resDM = await axios.get(`https://api.dailymotion.com/video/${videoId}?fields=stream_hls_url`);
+            if (resDM.data && resDM.data.stream_hls_url) {
+                // Redirigir al Roku inmediatamente al stream fresco
+                return res.redirect(302, resDM.data.stream_hls_url);
+            }
         }
-    } catch (error) {
-        console.log("Error extrayendo Color Visión, usando URL de reserva.");
+        res.status(500).send("No se pudo obtener el stream");
+    } catch (e) {
+        res.status(500).send("Error interno");
     }
+});
 
-    const canalesDominicanos = [
+app.get('/api/canales', (req, res) => {
+    res.json([
         {
             title: "Color Visión (Canal 9)",
-            description: "Noticias y programación dominicana.",
-            streamUrl: urlColorVision,
-            headers: [
-                "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Referer: https://www.dailymotion.com/"
-            ],
-            poster: "https://i.imgur.com/xQJ8kLO.png"
+            streamUrl: "https://roku-backend-rd.onrender.com/live/colorvision.m3u8"
         },
         {
-            title: "Telemicro (Canal 5)",
-            description: "Entretenimiento y programas dominicanos en vivo.",
-            streamUrl: "https://stmv1.srvif.com/telemicro/telemicro/playlist.m3u8",
-            poster: "https://i.imgur.com/vH9Z6X2.png"
+            title: "RTVD (Canal 4)",
+            streamUrl: "https://cdn.protvradiostream.com/canal4rd-1/ngrp:canal4rd-1_all/playlist.m3u8"
         }
-    ];
-
-    res.json(canalesDominicanos);
+    ]);
 });
 
-app.listen(PORT, () => {
-    console.log(`Servidor corriendo en el puerto ${PORT}`);
-});
+app.listen(PORT, () => console.log("Servidor listo"));
